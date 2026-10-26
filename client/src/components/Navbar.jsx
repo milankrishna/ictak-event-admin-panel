@@ -4,9 +4,9 @@ export default function Navbar() {
   return (
     <header className="site-header">
       <div className="nav-container">
-        <Link className="brand" to="/" aria-label="EventDesk dashboard">
-          <span className="brand-mark" aria-hidden="true">E</span>
-          <span>EventDesk<small>ADMIN PANEL</small></span>
+        <Link className="brand" to="/" aria-label="koot. dashboard">
+          <span className="brand-name">koot.</span>
+          <small lang="ml">കൂട്ടായ്മ</small>
         </Link>
         <nav aria-label="Main navigation">
           <NavLink to="/" end>Dashboard</NavLink>
