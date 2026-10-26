@@ -72,7 +72,7 @@ npm ci --prefix server
 
 ## Environment configuration
 
-The assessment requires working environment files. **`client/.env` and `server/.env` are intentionally eligible for version control and use dedicated assessment-only configuration.** The owner confirmed these resources were created solely for the exam. Other local environment variants remain ignored. Do not substitute personal or production credentials.
+The assessment requires working environment files. **`client/.env` and `server/.env` are included in the repository and use dedicated assessment-only configuration.** These resources were created solely for the exam. Other local environment variants remain ignored. Do not substitute personal or production credentials.
 
 | File | Variable | Purpose |
 |---|---|---|
@@ -123,7 +123,7 @@ Pages: `/` (dashboard), `/add-event` (create), `/edit-event/:id` (update).
 
 | Method | Endpoint | Result |
 |---|---|---|
-| GET | `/api/health` | HTTP 200 and server-health JSON |
+| GET | `/api/health` | HTTP 200 after MongoDB connection middleware succeeds; HTTP 503 if the connection cannot be established |
 | GET | `/api/events` | Events sorted by event date |
 | GET | `/api/events/:id` | One event, or HTTP 404 |
 | POST | `/api/events` | Create an event; HTTP 201 |
@@ -143,13 +143,13 @@ curl -i "http://localhost:BACKEND_PORT/api/health"
 curl -i "http://localhost:BACKEND_PORT/api/events"
 ```
 
-Both should return HTTP 200. The health response is `{"status":"ok","message":"Server is healthy."}`. This endpoint checks HTTP availability; the backend startup success message confirms the initial Atlas connection.
+Both should return HTTP 200 when MongoDB is available. The health response is `{"status":"ok","message":"Server is healthy."}`. MongoDB connection middleware runs before `/api/health`, so it also depends on database connectivity. If the connection helper fails, the middleware returns HTTP 503 with `{"message":"Database unavailable. Please try again shortly."}`. The helper reuses an established connection; the health endpoint does not perform a separate database ping.
 
 In the browser, create a clearly named test event, confirm it appears on the dashboard, edit its details, test cancellation of deletion, and then confirm deletion. Verify the layout on desktop and mobile. Build output, dependencies, and logs are excluded from Git.
 
-## Deploy to Vercel: one project
+## Vercel deployment: one project
 
-The root configuration builds the frontend and serves all Express routes through one Node.js function. The frontend and API share one HTTPS origin.
+The implemented application is committed to [GitHub](https://github.com/milankrishna/ictak-event-admin-panel) and deployed at [EventDesk](https://ictak-event-admin-panel.vercel.app). The root configuration builds the frontend and serves all Express routes through one Node.js function. The frontend and API share one HTTPS origin.
 
 ### Local commands
 
@@ -167,7 +167,7 @@ Local development still uses Vite on port 5173 and Express on port 5001, with th
 
 ### Vercel settings
 
-Once these configuration changes are committed and pushed with approval, import `milankrishna/ictak-event-admin-panel` once:
+The single Vercel project is connected to `milankrishna/ictak-event-admin-panel` with the following configuration:
 
 | Setting | Value |
 |---|---|
@@ -179,7 +179,7 @@ Once these configuration changes are committed and pushed with approval, import 
 | Build Command | `npm run build` |
 | Output Directory | `client/dist` |
 
-The root `vercel.json` specifies the install/build/output settings and function routing. Remove any old two-project settings before using it. `api/handler.js` exports the existing ES-module Express app without starting a listener. It reuses the existing connection helper and REST API implementation.
+The root `vercel.json` specifies the install/build/output settings and function routing. `api/handler.js` exports the existing ES-module Express app without starting a listener. It reuses the existing connection helper and REST API implementation.
 
 ### Vercel environment variables
 

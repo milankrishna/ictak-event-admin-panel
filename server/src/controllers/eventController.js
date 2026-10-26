@@ -16,7 +16,7 @@ function getEventInput(body) {
     return { error: 'Use at most 120 characters for the name, 2000 for the description, and 200 for the venue.' };
   }
 
-  // Date-only input matches an HTML date field and avoids timezone ambiguity.
+  // The frontend converts DD/MM/YYYY text to YYYY-MM-DD; validate it in UTC.
   const date = new Date(`${input.eventDate}T00:00:00.000Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.eventDate)
     || Number.isNaN(date.getTime())
