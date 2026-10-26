@@ -54,6 +54,10 @@ server/
   package.json
   package-lock.json
 .gitignore
+.vercelignore
+api/handler.js
+package.json
+vercel.json
 README.md
 ```
 
@@ -72,7 +76,7 @@ The assessment requires working environment files. **`client/.env` and `server/.
 
 | File | Variable | Purpose |
 |---|---|---|
-| `client/.env` | `VITE_API_URL` | Backend origin, without an `/api` suffix |
+| `client/.env` | `VITE_API_URL` | Local development backend origin, without an `/api` suffix; production uses same-origin requests |
 | `server/.env` | `PORT` | Backend HTTP port |
 | `server/.env` | `MONGO_URI` | Atlas connection URI including the intended database |
 | `server/.env` | `CLIENT_URL` | Allowed frontend origin for CORS |
@@ -81,7 +85,7 @@ Use the included `.env` files for evaluation; do not overwrite them with the exa
 
 For a separate Atlas setup, choose your own project/cluster, create a database user with access to the intended database, allow your current IP under **Network Access**, and obtain a URI from **Connect → Drivers**. Select the database explicitly and URL-encode special characters in credentials before setting `MONGO_URI` locally. An evaluator connecting from another network may need their IP allowed in Atlas.
 
-Keep `VITE_API_URL` aligned with the backend port and `CLIENT_URL` aligned with the Vite origin. Restart the corresponding server after environment changes. All `VITE_` variables are public browser configuration and must not contain database credentials.
+For local development, keep `VITE_API_URL` aligned with the backend port and `CLIENT_URL` aligned with the Vite origin. Restart the corresponding server after environment changes. All `VITE_` variables are public browser configuration and must not contain database credentials. Production builds always use `/` as the Axios base URL, so the tracked local API origin cannot accidentally be embedded as the production backend target.
 
 ## Run locally
 
@@ -142,3 +146,58 @@ curl -i "http://localhost:BACKEND_PORT/api/events"
 Both should return HTTP 200. The health response is `{"status":"ok","message":"Server is healthy."}`. This endpoint checks HTTP availability; the backend startup success message confirms the initial Atlas connection.
 
 In the browser, create a clearly named test event, confirm it appears on the dashboard, edit its details, test cancellation of deletion, and then confirm deletion. Verify the layout on desktop and mobile. Build output, dependencies, and logs are excluded from Git.
+
+## Deploy to Vercel: one project
+
+The root configuration builds the frontend and serves all Express routes through one Node.js function. The frontend and API share one HTTPS origin.
+
+### Local commands
+
+From the repository root:
+
+```sh
+npm run install:apps
+npm run build
+# In separate terminals:
+npm run dev:server
+npm run dev:client
+```
+
+Local development still uses Vite on port 5173 and Express on port 5001, with the existing local environment files. The root package targets Node.js 24.x to match Vercel. The install script uses the existing client/server lockfiles; no additional application dependencies are needed.
+
+### Vercel settings
+
+Once these configuration changes are committed and pushed with approval, import `milankrishna/ictak-event-admin-panel` once:
+
+| Setting | Value |
+|---|---|
+| Production branch | `master` |
+| Root Directory | Repository root (leave blank / `.`), not `client` or `server` |
+| Framework Preset | Other |
+| Node.js | 24.x |
+| Install Command | `npm run install:apps` |
+| Build Command | `npm run build` |
+| Output Directory | `client/dist` |
+
+The root `vercel.json` specifies the install/build/output settings and function routing. Remove any old two-project settings before using it. `api/handler.js` exports the existing ES-module Express app without starting a listener. It reuses the existing connection helper and REST API implementation.
+
+### Vercel environment variables
+
+- **`MONGO_URI`**: required; enter the existing Atlas URI privately in Vercel Settings → Environment Variables.
+- **`CLIENT_URL`**: set to the deployed application's HTTPS origin without a trailing slash. It continues to control CORS; normal deployed requests are same-origin.
+- **`VITE_API_URL`**: not required for production. Production builds use `/` explicitly; local development still reads the existing variable. Do not set this to `/api`, because callers already use `/api/events` and other full API paths.
+- **`PORT`**: not required by Vercel; only used for local startup.
+
+Set runtime variables for Production and also Preview if previews need database access. The deployment does not rely on the tracked local `.env` files: `.vercelignore` excludes them from uploads, and the function config excludes them from its bundle. Do not prefix the database variable with `VITE_`.
+
+Confirm Atlas Network Access allows Vercel outbound traffic, not only your laptop's IP. Default Vercel deployments do not guarantee a fixed outbound IP. Use an appropriate Atlas access rule or static egress configuration; for an exam-only database, an allow-from-anywhere rule is an option if permitted by your assessment.
+
+### Routing and verification
+
+1. `/api/*` is forwarded to the Express function, preserving the original API path.
+2. Real built assets are served from `client/dist`; missing assets do not fall back to HTML.
+3. Frontend routes such as `/add-event` and `/edit-event/:id` fall back to `index.html` for React Router.
+4. Verify `/api/health` and `/api/events` return HTTP 200. Unknown API routes must return JSON HTTP 404, not the React page.
+5. Refresh direct Add/Edit URLs and confirm JavaScript/CSS assets load.
+
+The function returns safe HTTP 503 responses if Atlas is unavailable. Warm instances reuse connections and concurrent cold-start requests share one connection attempt. Local startup remains separate in `server/src/server.js`.
